@@ -38,3 +38,12 @@ def scan(bv, sign, mask, start, end):
     
     return results
 
+
+def aob_input(bv):
+    aob_f = bn.interaction.TextLineField("Signature")
+    segments_f = bn.interaction.ChoiceField("Segment Protections", ["All", "Only Executable"])
+    if bn.interaction.get_form_input(["AoB Scanner", None, aob_f, segments_f], "AoB Scanner"):
+        aob_scan(bv, aob_f.result, segments_f == "Only Executable") # TODO: Debug this
+
+
+bn.PluginCommand.register("AoB Scan","AoB_Scan", aob_input)
