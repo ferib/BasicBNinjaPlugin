@@ -1,5 +1,5 @@
 import binaryninja as bn
-from binaryninja import LowLevelILOperation, Symbol, SymbolType
+from binaryninja import LowLevelILOperation, Symbol, SymbolType, types
 import struct
 
 #====================#
@@ -67,11 +67,26 @@ def find_vtables(bv):
 
 
 def is_valid_child(bv, address):
+    # valid vtable child have no xref and must point to executable memory
     vfunc = struct.unpack('<I', bv.read(address, bv.arch.address_size))[0]  
     if len(bv.get_code_refs(address)) == 0 and bv.is_offset_executable(vfunc):
         return True
     return False
 
+def define_vtable(bv, address, end):
+    # Name and define the vtable tree
+    bv.set_comment_at(address, "auto defined vTable") # good to know
+    bv.define_user_data_var(address, types.Type.int(bv.arch.address_size)) # set to DWORD/QWORD
+    bv.define_user_symbol(Symbol(SymbolType.DataSymbol, address,"vtable_" + str(hex(address))[2:] + "_0")) # give name
+    
+    # get children
+    for j in range(address+bv.arch.address_size, end, bv.arch.address_size):
+        if is_valid_child(bv, j):
+            print("Found vtable_" + str(hex(j))[2:] + "_" + str(hex(j-address))[2:] + " at " + str(hex(j)))
+            bv.define_user_data_var(j, types.Type.int(bv.arch.address_size)) # set to DWORD/QWORD
+            bv.define_user_symbol(Symbol(SymbolType.DataSymbol, j,"vtable_" + str(hex(j))[2:] + "_" + str(hex(j-address))[2:])) # give name
+        else:
+            break
 
 def scan_vtables_area(bv, start, end):
     buffer = bv.read(start, end-start)
@@ -93,7 +108,7 @@ def scan_vtables_area(bv, start, end):
                 ils = f.low_level_il
                 for j in range(0, len(ils)):
                     if ils[j].address == rf.address:
-                        # check if opcode is mov AND check if src is register AND check if dest is register
+                        # check if opcode is mov, check if src is register and check if dest is register
                         if (ils[j].operation == LowLevelILOperation.LLIL_STORE and
                             ils[j].src.operation == LowLevelILOperation.LLIL_CONST and
                             ils[j].dest.operation == LowLevelILOperation.LLIL_REG):
@@ -103,19 +118,7 @@ def scan_vtables_area(bv, start, end):
                             break
             if match:
                 print("Found vtable_" + str(hex(start+i))[2:] + "_0 at " + str(hex(start+i)))
-                #bv.set_comment_at(start+i, "vtable_" + str(hex(start+i))[2:] + "_0")
-                bv.define_user_data_var(start+i, types.Type.int(bv.arch.address_size)) # set to DWORD/QWORD
-                bv.define_user_symbol(Symbol(SymbolType.DataSymbol, start+i,"vtable_" + str(hex(start+i))[2:] + "_0")) # give name
-                
-                # get children
-                for j in range(start+i+bv.arch.address_size, end, bv.arch.address_size):
-                    if is_valid_child(bv, j):
-                        print("Found vtable_" + str(hex(j))[2:] + "_" + str(hex(j-start-i))[2:] + " at " + str(hex(j)))
-                        #bv.set_comment_at(j, "vtable_" + str(hex(j))[2:] + "_" + str(hex(j-start-i))[2:])
-                        bv.define_user_data_var(j, types.Type.int(bv.arch.address_size)) # set to DWORD/QWORD
-                        bv.define_user_symbol(Symbol(SymbolType.DataSymbol, j,"vtable_" + str(hex(j))[2:] + "_" + str(hex(j-start-i))[2:])) # give name
-                    else:
-                        break
+                define_vtable(bv, start+i, end) # define/name the vtable tree
 
 # add to menu
 bn.PluginCommand.register("AoB Scan","AoB_Scan", aob_input)
