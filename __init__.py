@@ -75,16 +75,18 @@ def is_valid_child(bv, address):
 
 def scan_vtables_area(bv, start, end):
     buffer = bv.read(start, end-start)
-    for i in range(0, len(buffer), bv.arch.address_size): # 4 or 8 depending on 32/64 bit
+    for i in range(0, len(buffer), bv.arch.address_size): # 4 or 8 size depending on 32/64 bit
         crefs = bv.get_code_refs(start + i)
-        if len(crefs) > 0: # has atleast one code reference, is constructor?
+        
+        # has atleast one code reference, is constructor?
+        if len(crefs) > 0: 
+        
             # check if table ptr is executable
             vfunc = struct.unpack('<I', bv.read(start+i, bv.arch.address_size))[0]
-            
             if not bv.is_offset_executable(vfunc):
                 continue
             
-            # check if xref is mov with reg dest
+            # check if all xrefs have mov operation with const source and reg destination
             match = False
             for rf in crefs:
                 f = bv.get_functions_containing(rf.address)[0] # only need first one?
@@ -110,8 +112,6 @@ def scan_vtables_area(bv, start, end):
                         bv.set_comment_at(j, "vtable_" + str(hex(j))[2:] + "_" + str(hex(j-start-i))[2:])
                     else:
                         break
-
-
 
 # add to menu
 bn.PluginCommand.register("AoB Scan","AoB_Scan", aob_input)
