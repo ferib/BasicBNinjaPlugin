@@ -68,7 +68,12 @@ def find_vtables(bv):
 
 def is_valid_child(bv, address):
     # valid vtable child have no xref and must point to executable memory
-    vfunc = struct.unpack('<I', bv.read(address, bv.arch.address_size))[0]  
+    vfunc = 0x00
+    if(bv.arch.address_size == 4):
+        vfunc = struct.unpack('<I', bv.read(start+i, 4))[0]
+    else:
+        vfunc = struct.unpack('<Q', bv.read(start+i, 8))[0]
+        
     if len(bv.get_code_refs(address)) == 0 and bv.is_offset_executable(vfunc):
         return True
     return False
@@ -82,7 +87,7 @@ def define_vtable(bv, address, end):
     # get children
     for j in range(address+bv.arch.address_size, end, bv.arch.address_size):
         if is_valid_child(bv, j):
-            print("Found vtable_" + str(hex(j))[2:] + "_" + str(hex(j-address))[2:] + " at " + str(hex(j)))
+            #print("Found vtable_" + str(hex(j))[2:] + "_" + str(hex(j-address))[2:] + " at " + str(hex(j)))
             bv.define_user_data_var(j, types.Type.int(bv.arch.address_size)) # set to DWORD/QWORD
             bv.define_user_symbol(Symbol(SymbolType.DataSymbol, j,"vtable_" + str(hex(j))[2:] + "_" + str(hex(j-address))[2:])) # give name
         else:
@@ -97,7 +102,12 @@ def scan_vtables_area(bv, start, end):
         if len(crefs) > 0: 
         
             # check if table ptr is executable
-            vfunc = struct.unpack('<I', bv.read(start+i, bv.arch.address_size))[0]
+            vfunc = 0x00
+            if(bv.arch.address_size == 4):
+                vfunc = struct.unpack('<I', bv.read(start+i, 4))[0]
+            else:
+                vfunc = struct.unpack('<Q', bv.read(start+i, 8))[0]
+                
             if not bv.is_offset_executable(vfunc):
                 continue
             
